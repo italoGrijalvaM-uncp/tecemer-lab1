@@ -1,3 +1,4 @@
+import os
 import matplotlib.pyplot as plt
 import matplotlib
 from tensorflow.keras import layers
@@ -5,6 +6,7 @@ from tensorflow import keras
 from sklearn.metrics import accuracy_score
 from sklearn.linear_model import LogisticRegression
 import numpy as np
+
 # 1. Cargar los arreglos guardados en la Parte 1
 datos = np.load("dataset_preparado.npz")
 X_train, X_test = datos["X_train"], datos["X_test"]
@@ -21,26 +23,36 @@ print(
     f"\nPrecisión del baseline (regresión logística): {precision_baseline:.4f}")
 
 matplotlib.use("Agg")
-# 3. Definir, compilar y entrenar la red neuronal
-modelo = keras.Sequential([
-    layers.Input(shape=(X_train.shape[1],)),
-    layers.Dense(8, activation="relu"),
-    layers.Dense(4, activation="relu"),
-    layers.Dense(1, activation="sigmoid"),
-])
-modelo.compile(optimizer="adam", loss="binary_crossentropy",
-               metrics=["accuracy"])
+# 3. Cargar o definir la red neuronal para entrenamiento continuo
+if os.path.exists("modelo_lluvia.keras"):
+    print("\nCargando modelo previo para continuar entrenamiento...")
+    modelo = keras.models.load_model("modelo_lluvia.keras")
+else:
+    print("\nNo se encontró modelo previo. Creando uno nuevo desde cero...")
+    modelo = keras.Sequential([
+        layers.Input(shape=(X_train.shape[1],)),
+        layers.Dense(8, activation="relu"),
+        layers.Dense(4, activation="relu"),
+        layers.Dense(1, activation="sigmoid"),
+    ])
+    modelo.compile(
+        optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"]
+    )
 
+# Entrenar (sumará 40 épocas adicionales si ya existía el modelo)
 historial = modelo.fit(
-    X_train, y_train,
+    X_train,
+    y_train,
     epochs=40,
     batch_size=8,
     validation_split=0.2,
     verbose=1,
 )
+
 perdida_test, precision_test = modelo.evaluate(X_test, y_test, verbose=0)
 print(f"\nPrecisión del MLP en test: {precision_test:.4f}")
 print(f"Precisión del baseline en test: {precision_baseline:.4f}")
+
 plt.figure(figsize=(6, 4))
 plt.plot(historial.history["loss"], label="entrenamiento")
 plt.plot(historial.history["val_loss"], label="validación")
@@ -51,6 +63,6 @@ plt.tight_layout()
 plt.savefig("curvas_entrenamiento_lluvia.png", dpi=100)
 print("\nGráfico guardado en curvas_entrenamiento_lluvia.png")
 
-# 4. Guardar el modelo entrenado para reutilizarlo sin reentrenar
+# 4. Guardar el modelo actualizado
 modelo.save("modelo_lluvia.keras")
-print("\nModelo guardado en modelo_lluvia.keras")
+print("\nModelo actualizado y guardado en modelo_lluvia.keras")
